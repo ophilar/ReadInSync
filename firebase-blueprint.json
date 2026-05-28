@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "scroll_state": {
+      "title": "Scroll Position",
+      "description": "Represents the active vertical reading percentage for a specific web page.",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The exact absolute web URL of the page."
+        },
+        "percent": {
+          "type": "number",
+          "description": "Percentage float of scroll position (between 0 and 1)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The server-validated timestamp of when the scroll position last updated."
+        }
+      },
+      "required": ["url", "percent", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/scroll_states/{urlHash}": {
+      "schema": "scroll_state",
+      "description": "Stores user reading positions indexed by a deterministic alphanumeric hash of the page URL."
+    }
+  }
+}

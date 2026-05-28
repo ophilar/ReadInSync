@@ -1,0 +1,6 @@
+{
+  "name": "Cross-Device Scroll Synchronizer",
+  "description": "A lightweight, offline-resilient scroll sync manager and bento-styled configuration dashboard for the Firefox cross-device scroll synchronizer extension.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
