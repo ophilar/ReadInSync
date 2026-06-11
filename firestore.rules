@@ -8,14 +8,8 @@ service cloud.firestore {
 
     // Path variable validation and private sync group validation
     match /users/{userId}/scroll_states/{urlHash} {
-      allow read: if isValidId(userId) && userId == "my_shared_private_sync_id";
-
-      allow create, update: if isValidId(userId) 
-        && userId == "my_shared_private_sync_id"
-        && isValidId(urlHash)
-        && isValidScrollState(request.resource.data);
-
-      allow delete: if isValidId(userId) && userId == "my_shared_private_sync_id";
+      allow read, delete: if isValidId(userId) && isValidId(urlHash);
+      allow write: if isValidId(userId) && isValidId(urlHash) && isValidScrollState(request.resource.data);
     }
   }
 
@@ -24,12 +18,12 @@ service cloud.firestore {
   }
 
   function isValidScrollState(data) {
-    return data.keys().hasAll(['url', 'percent', 'updatedAt'])
+    return data.keys().hasAll(['ciphertext', 'iv', 'updatedAt'])
       && data.keys().size() == 3
-      && data.url is string
-      && data.url.size() <= 2048
-      && data.percent is number
-      && data.percent >= 0.0
-      && data.percent <= 1.0;
+      && data.ciphertext is string
+      && data.ciphertext.size() <= 8192
+      && data.iv is string
+      && data.iv.size() <= 128
+      && data.updatedAt is string;
   }
 }

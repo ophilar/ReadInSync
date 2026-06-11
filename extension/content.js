@@ -1,79 +1,130 @@
 /**
- * Live Page Scroll Synchronizer - Content Script
- * Tracks user scrolling natively and restores reading positions safely.
+ * ReadInSync - Content Script
+ * Monitors viewport coordinates, handles page exit triggers, and restores positions.
  */
 
-// Keep track of whether the page has finished initializing.
-// This prevents feedback loops where scroll adjustments cause active save operations.
 let isInitialLoad = true;
 let debounceTimeout = null;
+let lastSentPercent = -1;
+let isProgrammaticScroll = false;
+let restorationTargetPercent = null;
+let heightObserver = null;
 
-// Listen for messages from the background service worker context.
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+function applyScrollRestoration(percent) {
+  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+
+  if (scrollableHeight > 0) {
+    const targetScrollY = percent * scrollableHeight;
+
+    isProgrammaticScroll = true;
+    window.scrollTo({
+      top: targetScrollY,
+      behavior: "auto" // Switch to instant scroll to prevent event loop spam and match UX best practice
+    });
+
+    lastSentPercent = percent;
+    isInitialLoad = false;
+
+    if (heightObserver) {
+      heightObserver.disconnect();
+      heightObserver = null;
+    }
+    return true;
+  }
+  return false;
+}
+
+// Restores the scroll position sent from the background service worker
+chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "RESTORE_SCROLL") {
     const { percent } = message;
 
-    // Only restore scroll if we are in the initial loading phase.
     if (isInitialLoad && typeof percent === "number") {
-      const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+      restorationTargetPercent = percent;
+      const success = applyScrollRestoration(percent);
 
-      if (scrollableHeight > 0) {
-        const targetScrollY = percent * scrollableHeight;
-        
-        // Smoothly adjust the viewport scroll location.
-        window.scrollTo({
-          top: targetScrollY,
-          behavior: "smooth"
+      // If page height is too small (SPA loading), observe changes to document structure
+      if (!success && !heightObserver) {
+        heightObserver = new MutationObserver(() => {
+          if (isInitialLoad && restorationTargetPercent !== null) {
+            applyScrollRestoration(restorationTargetPercent);
+          }
+        });
+        heightObserver.observe(document.body || document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true
         });
       }
-      
-      // Turn off initial load flag after restoring
-      isInitialLoad = false;
     }
   }
 });
 
-// Capture viewport scrolling events to sync upstream.
+// Primary function to transmit coordinate snapshot upstream
+function flushScrollState() {
+  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+  if (scrollableHeight <= 0) return;
+
+  const currentScrollY = window.scrollY;
+  const percent = Math.min(Math.max(currentScrollY / scrollableHeight, 0), 1);
+
+  // Avoid redundant writes if coordinates haven't changed
+  if (Math.abs(percent - lastSentPercent) < 0.0001) return;
+
+  lastSentPercent = percent;
+
+  chrome.runtime.sendMessage({
+    type: "SAVE_SCROLL",
+    url: window.location.href,
+    title: document.title || window.location.hostname,
+    percent: parseFloat(percent.toFixed(5))
+  }, () => {
+    if (chrome.runtime.lastError) {
+      // Discard runtime closed contexts gracefully
+    }
+  });
+}
+
+// Debounced listener on scroll events
 window.addEventListener("scroll", () => {
-  // If we are currently restoring or haven't settled the initial sync, hold off.
-  if (isInitialLoad) {
-    // If the user scrolls manually before restore, we clear the initial load flag.
-    isInitialLoad = false;
+  if (isProgrammaticScroll) {
+    isProgrammaticScroll = false; // Reset flag and ignore event
     return;
   }
 
-  // Active scroll debounce to limit database write frequencies.
-  if (debounceTimeout) {
-    clearTimeout(debounceTimeout);
+  if (isInitialLoad) {
+    // If the user scrolls manually during page load, terminate auto-restore gate
+    isInitialLoad = false;
+    if (heightObserver) {
+      heightObserver.disconnect();
+      heightObserver = null;
+    }
+    return;
   }
 
+  if (debounceTimeout) clearTimeout(debounceTimeout);
+
   debounceTimeout = setTimeout(() => {
-    const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
-    
-    // Avoid calculations if the page isn't scrollable.
-    if (scrollableHeight <= 0) {
-      return;
-    }
-
-    const currentScrollY = window.scrollY;
-    const percent = Math.min(Math.max(currentScrollY / scrollableHeight, 0), 1);
-
-    // Communicate scroll position update to the background service worker thread.
-    chrome.runtime.sendMessage({
-      type: "SAVE_SCROLL",
-      url: window.location.href,
-      percent: parseFloat(percent.toFixed(5))
-    }, (response) => {
-      // Gracefully handle runtime disconnected conditions (e.g., extension reloaded in development).
-      if (chrome.runtime.lastError) {
-        // Discard gracefully.
-      }
-    });
+    flushScrollState();
   }, 1000); // 1-second debounce
 });
 
-// Fallback safety gate: If no RESTORE_SCROLL is received within 3 seconds,
-// release the listener to make sure manual scrolls capture correctly.
+// Exit/Suspension flush handlers to prevent data loss on tab closure or app context switching
+window.addEventListener("beforeunload", () => {
+  flushScrollState();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    flushScrollState();
+  }
+});
+
+// Fallback protection: If restoration isn't established within 3 seconds, unblock manual operations
 setTimeout(() => {
   isInitialLoad = false;
+  if (heightObserver) {
+    heightObserver.disconnect();
+    heightObserver = null;
+  }
 }, 3000);

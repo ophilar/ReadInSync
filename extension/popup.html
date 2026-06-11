@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+    }
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text);
+      box-sizing: border-box;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 12px;
+    }
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+    }
+    .logo-inner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin: 0;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin: 2px 0 0 0;
+      font-family: monospace;
+    }
+    .card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    label {
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .input-wrapper {
+      display: flex;
+      gap: 6px;
+    }
+    input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #fff;
+      font-family: monospace;
+      outline: none;
+      transition: all 0.2s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: var(--accent-hover);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--glass-border);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      margin-top: 16px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+    .alert {
+      font-size: 10px;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      padding: 8px;
+      border-radius: 6px;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-inner"></div>
+    </div>
+    <div>
+      <h1 class="title">ReadInSync</h1>
+      <p class="subtitle">Mandatory E2EE Scroll Tracker</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="form-group">
+      <label for="syncId">Sync Profile ID</label>
+      <div class="input-wrapper">
+        <input type="text" id="syncId" readonly placeholder="Generating...">
+        <button class="btn btn-secondary" id="btnCopy" title="Copy Sync ID">Copy</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="syncPassword">E2EE Sync Password</label>
+      <input type="password" id="syncPassword" placeholder="Enter sync password">
+    </div>
+
+    <div class="form-group" style="display: flex; gap: 8px; margin-top: 16px;">
+      <button class="btn" id="btnSave" style="flex: 1;">Save Sync Config</button>
+      <button class="btn btn-secondary" id="btnRegen" title="Regenerate Sync ID">Regen ID</button>
+    </div>
+
+    <div class="alert" id="errorMsg"></div>
+
+    <div class="status-badge" id="statusBadge">
+      <div class="status-dot"></div>
+      <span id="statusText">Active E2EE Session</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
