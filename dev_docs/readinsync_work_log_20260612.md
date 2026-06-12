@@ -16,5 +16,8 @@
 - Verified that the Vite production build works perfectly (`npm run build`).
 - Confirmed that the unit test suite (`npm test`) passes with 100% success.
 - Restored the repository's git remote and verified that the secret is completely absent from all logs.
+- Merged the hardened and rewritten `feat/extension-audit-fixes` branch directly into `main`.
+- Force pushed both `feat/extension-audit-fixes` and `main` branches to the remote origin to complete history rewriting.
 - Updated the project roadmap in [readinsync_roadmap.md](file:///H:/ReaInSync/dev_docs/readinsync_roadmap.md) to document the security remediation.
+
 
