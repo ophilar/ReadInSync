@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -53,12 +54,12 @@ export default function App() {
   const [customTitle, setCustomTitle] = useState<string>("");
   const [customPercent, setCustomPercent] = useState<number>(0.5);
 
-  // Firestore placeholder configs (can be updated locally)
+  // Firestore placeholder configs (can be updated locally or overridden via env variables)
   const [firebaseConfig, setFirebaseConfig] = useState({
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    projectId: "tabtogether-d6291",
-    authDomain: "tabtogether-d6291.firebaseapp.com",
-    storageBucket: "tabtogether-d6291.firebasestorage.app"
+    apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || "YOUR_FIREBASE_API_KEY",
+    projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || "YOUR_PROJECT_ID",
+    authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || "YOUR_PROJECT_ID.firebaseapp.com",
+    storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || "YOUR_PROJECT_ID.firebasestorage.app"
   });
 
   const activeSession = syncSessions.find(s => s.id === selectedSessionId) || syncSessions[0];
@@ -220,6 +221,7 @@ export default function App() {
             copiedStates={copiedStates}
             triggerCopy={triggerCopy}
             handleDownload={handleDownload}
+            firebaseConfig={firebaseConfig}
           />
         )}
 

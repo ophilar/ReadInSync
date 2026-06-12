@@ -8,6 +8,12 @@ interface CodeInspectorTabProps {
   copiedStates: { [key: string]: boolean };
   triggerCopy: (key: string, text: string) => void;
   handleDownload: (filename: string, content: string) => void;
+  firebaseConfig: {
+    apiKey: string;
+    projectId: string;
+    authDomain: string;
+    storageBucket: string;
+  };
 }
 
 export default function CodeInspectorTab({
@@ -15,20 +21,35 @@ export default function CodeInspectorTab({
   setActiveCodeFile,
   copiedStates,
   triggerCopy,
-  handleDownload
+  handleDownload,
+  firebaseConfig
 }: CodeInspectorTabProps) {
   
-  const getFileContent = () => {
-    switch (activeCodeFile) {
+  const getFileContent = (fileType = activeCodeFile) => {
+    let rawContent = "";
+    switch (fileType) {
       case "manifest.json":
-        return manifestCode;
+        rawContent = manifestCode;
+        break;
       case "content.js":
-        return contentCode;
+        rawContent = contentCode;
+        break;
       case "background.js":
-        return backgroundCode;
+        rawContent = backgroundCode;
+        break;
       case "crypto.js":
-        return cryptoCode;
+        rawContent = cryptoCode;
+        break;
     }
+
+    if (fileType === "background.js") {
+      return rawContent
+        .replace("YOUR_FIREBASE_API_KEY", firebaseConfig.apiKey)
+        .replace("YOUR_FIREBASE_AUTH_DOMAIN", firebaseConfig.authDomain)
+        .replace("YOUR_FIREBASE_PROJECT_ID", firebaseConfig.projectId)
+        .replace("YOUR_FIREBASE_STORAGE_BUCKET", firebaseConfig.storageBucket);
+    }
+    return rawContent;
   };
 
   return (
@@ -106,25 +127,25 @@ export default function CodeInspectorTab({
             <h4 className="text-xs font-semibold text-slate-900 mb-2">Workspace Actions</h4>
             <div className="space-y-2">
               <button
-                onClick={() => handleDownload("manifest.json", manifestCode)}
+                onClick={() => handleDownload("manifest.json", getFileContent("manifest.json"))}
                 className="w-full py-1.5 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download size={12} /> Download manifest.json
               </button>
               <button
-                onClick={() => handleDownload("content.js", contentCode)}
+                onClick={() => handleDownload("content.js", getFileContent("content.js"))}
                 className="w-full py-1.5 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download size={12} /> Download content.js
               </button>
               <button
-                onClick={() => handleDownload("crypto.js", cryptoCode)}
+                onClick={() => handleDownload("crypto.js", getFileContent("crypto.js"))}
                 className="w-full py-1.5 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download size={12} /> Download crypto.js
               </button>
               <button
-                onClick={() => handleDownload("background.js", backgroundCode)}
+                onClick={() => handleDownload("background.js", getFileContent("background.js"))}
                 className="w-full py-1.5 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download size={12} /> Download background.js
