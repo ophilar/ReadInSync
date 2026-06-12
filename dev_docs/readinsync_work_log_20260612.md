@@ -19,5 +19,11 @@
 - Merged the hardened and rewritten `feat/extension-audit-fixes` branch directly into `main`.
 - Force pushed both `feat/extension-audit-fixes` and `main` branches to the remote origin to complete history rewriting.
 - Updated the project roadmap in [readinsync_roadmap.md](file:///H:/ReaInSync/dev_docs/readinsync_roadmap.md) to document the security remediation.
+- Investigated and resolved all 17 Dependabot vulnerabilities flagged on push:
+  - Upgraded `web-ext` to version `^10.3.0`.
+  - Added dependency overrides in `package.json` to lock secure transitive dependencies: `shell-quote` (`^1.8.4`), `path-to-regexp` (`^0.1.13`), and `qs` (`^6.15.2`).
+  - Ran `npm install` and verified that **0 vulnerabilities** remain in the project audit report.
+  - Confirmed compatibility by verifying that TypeScript compile checks (`npx tsc --noEmit`), Vite production builds (`npm run build`), and Jest tests (`npm test`) all pass with 100% success.
+
 
 

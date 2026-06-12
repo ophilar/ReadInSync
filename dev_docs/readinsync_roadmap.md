@@ -53,5 +53,6 @@ Successfully refactored the codebase by splitting the companion application's `A
 Conducted a thorough engineering and security audit of the browser extension (`manifest.json`, `background.js`, `content.js`, `crypto.js`) and Firestore rules. Identifed critical race conditions in Service Worker initialization, SPA scroll height restoration, programmatic scroll capturing loops, and validation logic gaps in security rules. Compiled all findings and proposed code solutions in an audit report.
 
 ## Update: 2026-06-12
-Checked and resolved the GitHub security alert regarding hardcoded Google API credentials. Replaced hardcoded credentials in the extension background script (`extension/background.js`), the React companion simulator state (`src/App.tsx`), and the companion template definitions (`src/templates.ts`) with clear placeholder credentials to prevent leakage.
+Checked and resolved the GitHub security alert regarding hardcoded Google API credentials. Replaced hardcoded credentials in the extension background script (`extension/background.js`), the React companion simulator state (`src/App.tsx`), and the companion template definitions (`src/templates.ts`) with clear placeholder credentials to prevent leakage. Also resolved all 17 Dependabot security vulnerabilities by upgrading `web-ext` and locking transitive dependencies (`shell-quote`, `path-to-regexp`, `qs`) via package overrides, resulting in **0 vulnerabilities** reported.
+
 
