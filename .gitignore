@@ -8,3 +8,5 @@ coverage/
 !.env.example
 web-ext-artifacts/
 dist-extension/
+firebase-config.json
+extension/firebase-config.json

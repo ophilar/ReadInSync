@@ -14,6 +14,7 @@ import SimulatorTab, { SyncSession } from "./components/SimulatorTab";
 import CodeInspectorTab from "./components/CodeInspectorTab";
 import SchemaTab from "./components/SchemaTab";
 import SetupGuideTab from "./components/SetupGuideTab";
+import firebaseConfigData from "../firebase-config.json";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"simulator" | "code" | "schema" | "guide">("simulator");
@@ -54,28 +55,23 @@ export default function App() {
   const [customTitle, setCustomTitle] = useState<string>("");
   const [customPercent, setCustomPercent] = useState<number>(0.5);
 
-  // Verify all required environment variables are defined; fail-fast if any are missing
-  const REQUIRED_VITE_VARS = [
-    "VITE_FIREBASE_API_KEY",
-    "VITE_FIREBASE_PROJECT_ID",
-    "VITE_FIREBASE_AUTH_DOMAIN",
-    "VITE_FIREBASE_STORAGE_BUCKET"
-  ];
-  const missingViteVars = REQUIRED_VITE_VARS.filter(v => !import.meta.env[v]);
-  if (missingViteVars.length > 0) {
+  // Verify all required Firebase config fields are defined; fail-fast if any are missing/placeholders
+  const REQUIRED_CONFIG_KEYS = ["apiKey", "projectId", "authDomain", "storageBucket"];
+  const missingKeys = REQUIRED_CONFIG_KEYS.filter(k => !firebaseConfigData[k as keyof typeof firebaseConfigData] || (firebaseConfigData[k as keyof typeof firebaseConfigData] as string).startsWith("YOUR_FIREBASE_"));
+  if (missingKeys.length > 0) {
     throw new Error(
-      `❌ [ReadInSync] LOUD FAILURE: Missing required Firebase environment variables in React app:\n` +
-      missingViteVars.map(v => ` - ${v}`).join("\n") +
-      `\nPlease define these in a '.env.local' file in the root of the project.`
+      `❌ [ReadInSync] LOUD FAILURE: Missing or placeholder Firebase configuration keys in firebase-config.json:\n` +
+      missingKeys.map(k => ` - ${k}`).join("\n") +
+      `\nPlease define these in 'firebase-config.json' in the root directory.`
     );
   }
 
-  // Firestore configs loaded directly from env variables (no fallback defaults)
+  // Firestore configs loaded directly from firebase-config.json (no fallback defaults)
   const [firebaseConfig, setFirebaseConfig] = useState({
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string
+    apiKey: firebaseConfigData.apiKey,
+    projectId: firebaseConfigData.projectId,
+    authDomain: firebaseConfigData.authDomain,
+    storageBucket: firebaseConfigData.storageBucket
   });
 
   const activeSession = syncSessions.find(s => s.id === selectedSessionId) || syncSessions[0];

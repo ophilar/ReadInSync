@@ -64,6 +64,7 @@
       padding: 16px;
       backdrop-filter: blur(10px);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      margin-bottom: 14px;
     }
     .form-group {
       margin-bottom: 14px;
@@ -125,6 +126,9 @@
     .btn-secondary:hover {
       background: rgba(255, 255, 255, 0.15);
     }
+    .btn-full {
+      width: 100%;
+    }
     .status-badge {
       display: flex;
       align-items: center;
@@ -159,6 +163,17 @@
       margin-top: 10px;
       display: none;
     }
+    .auth-state {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .auth-user-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
@@ -168,11 +183,22 @@
     </div>
     <div>
       <h1 class="title">ReadInSync</h1>
-      <p class="subtitle">Mandatory E2EE Scroll Tracker</p>
+      <p class="subtitle">Secure E2EE Scroll Tracker</p>
     </div>
   </div>
 
+  <!-- Authentication Card -->
   <div class="card">
+    <label>Account Status</label>
+    <div class="auth-state">
+      <div id="authStatusText">Checking authentication...</div>
+      <div id="authUserEmail" class="auth-user-info" style="display: none;"></div>
+      <button class="btn btn-secondary btn-full" id="btnAuthAction">Sign In to Sync</button>
+    </div>
+  </div>
+
+  <!-- Profile & E2EE Card -->
+  <div class="card" id="profileCard">
     <div class="form-group">
       <label for="syncId">Sync Profile ID</label>
       <div class="input-wrapper">
@@ -193,45 +219,12 @@
 
     <div class="alert" id="errorMsg"></div>
 
-    <div style="margin-top: 16px; border-top: 1px solid var(--glass-border); padding-top: 16px;">
-      <label style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;" id="toggleFirebase">
-        <span>Firebase Credentials (Local Override)</span>
-        <span id="toggleArrow" style="transition: transform 0.2s;">▼</span>
-      </label>
-      <div id="firebaseFields" style="display: none; margin-top: 12px; border-left: 2px solid var(--accent); padding-left: 10px;">
-        <div class="form-group">
-          <label for="fbApiKey">API Key</label>
-          <input type="password" id="fbApiKey" placeholder="Firebase API Key">
-        </div>
-        <div class="form-group">
-          <label for="fbAuthDomain">Auth Domain</label>
-          <input type="text" id="fbAuthDomain" placeholder="project-id.firebaseapp.com">
-        </div>
-        <div class="form-group">
-          <label for="fbProjectId">Project ID</label>
-          <input type="text" id="fbProjectId" placeholder="project-id">
-        </div>
-        <div class="form-group">
-          <label for="fbStorageBucket">Storage Bucket</label>
-          <input type="text" id="fbStorageBucket" placeholder="project-id.firebasestorage.app">
-        </div>
-        <div class="form-group">
-          <label for="fbMessagingSenderId">Messaging Sender ID</label>
-          <input type="text" id="fbMessagingSenderId" placeholder="Sender ID">
-        </div>
-        <div class="form-group">
-          <label for="fbAppId">App ID</label>
-          <input type="text" id="fbAppId" placeholder="1:sender:web:id">
-        </div>
-      </div>
-    </div>
-
-    <div class="status-badge" id="statusBadge">
+    <div class="status-badge" id="statusBadge" style="display: none;">
       <div class="status-dot"></div>
       <span id="statusText">Active E2EE Session</span>
     </div>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="popup.js" type="module"></script>
 </body>
 </html>

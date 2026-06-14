@@ -1,11 +1,11 @@
 /**
  * ReadInSync - Background Service Worker (ES Module)
- * Implements mandatory E2EE coordination, secure Firestore communication, and coordinate routing.
+ * Implements E2EE coordination, secure Firestore communication, and auth management.
  */
 
-// Native Module Imports (Assume local bundles in extension directory)
-import { initializeApp } from "./firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "./firebase-firestore.js";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { deriveSyncKey, encryptPayload, decryptPayload } from "./crypto.js";
 
 // Storage keys corresponding to configuration
@@ -14,57 +14,9 @@ const STORAGE_KEYS = {
   SYNC_PASSWORD: "readinsync_sync_password"
 };
 
-// Clean Firebase integration config credentials payload placeholder
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-  projectId: "YOUR_FIREBASE_PROJECT_ID",
-  storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
-};
-
 let app = null;
 let db = null;
-
-async function getFirebaseDb() {
-  if (db) return db;
-
-  // Retrieve custom Firebase config from local storage first (for local machine / user overrides)
-  const storageData = await chrome.storage.local.get([
-    "firebase_apiKey",
-    "firebase_authDomain",
-    "firebase_projectId",
-    "firebase_storageBucket",
-    "firebase_messagingSenderId",
-    "firebase_appId"
-  ]);
-
-  const config = {
-    apiKey: storageData.firebase_apiKey || firebaseConfig.apiKey,
-    authDomain: storageData.firebase_authDomain || firebaseConfig.authDomain,
-    projectId: storageData.firebase_projectId || firebaseConfig.projectId,
-    storageBucket: storageData.firebase_storageBucket || firebaseConfig.storageBucket,
-    messagingSenderId: storageData.firebase_messagingSenderId || firebaseConfig.messagingSenderId,
-    appId: storageData.firebase_appId || firebaseConfig.appId
-  };
-
-  // Loud error if any required Firebase settings are missing or still placeholder values
-  const hasPlaceholders = Object.entries(config).some(([key, val]) => {
-    return !val || val.includes("YOUR_FIREBASE_") || val === "YOUR_PROJECT_ID.firebaseapp.com";
-  });
-
-  if (hasPlaceholders) {
-    throw new Error(
-      "❌ [ReadInSync] LOUD FAILURE: Firebase configuration is missing or holds placeholder values! " +
-      "Provide environment variables at build-time, or configure custom credentials under the extension's local storage options."
-    );
-  }
-
-  app = initializeApp(config);
-  db = getFirestore(app);
-  return db;
-}
+let auth = null;
 
 // In-memory caching of the active cryptographic key and Sync ID
 let derivedCryptoKey = null;
@@ -82,25 +34,61 @@ function isUrlSafe(url) {
   }
 }
 
+// Asynchronous Firebase services initialization
+async function ensureFirebaseInitialized() {
+  if (db && auth) return { db, auth };
+
+  const configRes = await fetch(chrome.runtime.getURL("firebase-config.json"));
+  const firebaseConfig = await configRes.json();
+
+  const required = ["apiKey", "projectId", "authDomain", "appId"];
+  const missing = required.filter((k) => !firebaseConfig[k] || firebaseConfig[k].startsWith("YOUR_FIREBASE_"));
+  if (missing.length > 0) {
+    throw new Error(`❌ [ReadInSync] LOUD FAILURE: Missing or placeholder Firebase keys: ${missing.join(", ")}`);
+  }
+
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+
+  // Auto-authenticate anonymously if no active user session exists
+  if (!auth.currentUser) {
+    console.log("[ReadInSync] Initiating anonymous session authentication...");
+    await signInAnonymously(auth);
+  }
+
+  return { db, auth };
+}
+
 /**
  * Initializes security configuration, deriving the AES key from local storage values.
  */
 async function initSyncConfig() {
   try {
-    let storageData;
+    let services;
     try {
-      storageData = await chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD]);
-    } catch {
-      storageData = await new Promise((resolve) => {
-        chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD], resolve);
-      });
+      services = await ensureFirebaseInitialized();
+    } catch (err) {
+      console.error("[ReadInSync] Firebase service worker initialization failed:", err.message);
+      derivedCryptoKey = null;
+      currentSyncId = null;
+      return;
     }
 
-    const syncId = storageData[STORAGE_KEYS.SYNC_ID];
+    const { auth } = services;
+    const storageData = await chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD]);
+    
+    // Determine the Sync Profile ID
+    // If signed in with a real federated account, enforce using the UID.
+    let syncId = storageData[STORAGE_KEYS.SYNC_ID];
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+      syncId = auth.currentUser.uid;
+    }
+    
     const syncPassword = storageData[STORAGE_KEYS.SYNC_PASSWORD];
 
     if (!syncId || !syncPassword) {
-      console.warn("[ReadInSync] Missing configuration. Deferring E2EE initialization until configured via popup.");
+      console.warn("[ReadInSync] Missing configuration. Deferring E2EE initialization.");
       derivedCryptoKey = null;
       currentSyncId = null;
       return;
@@ -108,7 +96,7 @@ async function initSyncConfig() {
 
     currentSyncId = syncId;
     derivedCryptoKey = await deriveSyncKey(syncPassword, syncId);
-    console.log("[ReadInSync] Cryptographic key successfully derived. Secure sync active.");
+    console.log("[ReadInSync] Cryptographic key derived successfully. Sync ID:", currentSyncId);
   } catch (error) {
     console.error("[ReadInSync] Error initializing encryption configuration:", error);
     derivedCryptoKey = null;
@@ -159,11 +147,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      getFirebaseDb()
-        .then((database) => {
+      ensureFirebaseInitialized()
+        .then(({ db }) => {
           const docId = getUrlHash(url);
           const docPath = `users/${currentSyncId}/scroll_states/${docId}`;
-          const docRef = doc(database, docPath);
+          const docRef = doc(db, docPath);
 
           // Formulate structured state and encrypt everything into a single ciphertext string
           const statePayload = { url, title, percent };
@@ -204,10 +192,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     }
 
     try {
-      const database = await getFirebaseDb();
+      const { db } = await ensureFirebaseInitialized();
       const docId = getUrlHash(tab.url);
       const docPath = `users/${currentSyncId}/scroll_states/${docId}`;
-      const docRef = doc(database, docPath);
+      const docRef = doc(db, docPath);
 
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {

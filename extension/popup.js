@@ -1,7 +1,5 @@
-/**
- * ReadInSync - Popup Controller
- * Manages configuration storage (Sync ID and Password) and communicates config changes.
- */
+import { initializeApp } from "firebase/app";
+import { getAuth, signOut, onAuthStateChanged } from "firebase/auth";
 
 const STORAGE_KEYS = {
   SYNC_ID: "readinsync_sync_id",
@@ -20,7 +18,6 @@ function generateSecureId(length = 16) {
   return id;
 }
 
-// Initial configuration loading
 document.addEventListener("DOMContentLoaded", async () => {
   const syncIdInput = document.getElementById("syncId");
   const syncPasswordInput = document.getElementById("syncPassword");
@@ -30,71 +27,96 @@ document.addEventListener("DOMContentLoaded", async () => {
   const errorMsg = document.getElementById("errorMsg");
   const statusBadge = document.getElementById("statusBadge");
 
-  // Firebase elements
-  const toggleFirebase = document.getElementById("toggleFirebase");
-  const firebaseFields = document.getElementById("firebaseFields");
-  const toggleArrow = document.getElementById("toggleArrow");
-  const fbApiKeyInput = document.getElementById("fbApiKey");
-  const fbAuthDomainInput = document.getElementById("fbAuthDomain");
-  const fbProjectIdInput = document.getElementById("fbProjectId");
-  const fbStorageBucketInput = document.getElementById("fbStorageBucket");
-  const fbMessagingSenderIdInput = document.getElementById("fbMessagingSenderId");
-  const fbAppIdInput = document.getElementById("fbAppId");
+  const authStatusText = document.getElementById("authStatusText");
+  const authUserEmail = document.getElementById("authUserEmail");
+  const btnAuthAction = document.getElementById("btnAuthAction");
 
-  // Collapsible toggle for Firebase credentials
-  toggleFirebase.addEventListener("click", () => {
-    const isHidden = firebaseFields.style.display === "none";
-    firebaseFields.style.display = isHidden ? "block" : "none";
-    toggleArrow.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
-  });
+  let auth = null;
+  let customSyncId = "";
+  let currentUid = null;
 
-  // Load from local storage
-  const keysToGet = [
-    STORAGE_KEYS.SYNC_ID,
-    STORAGE_KEYS.SYNC_PASSWORD,
-    "firebase_apiKey",
-    "firebase_authDomain",
-    "firebase_projectId",
-    "firebase_storageBucket",
-    "firebase_messagingSenderId",
-    "firebase_appId"
-  ];
-
-  let data;
+  // 1. Fetch Firebase config and initialize Auth
   try {
-    data = await chrome.storage.local.get(keysToGet);
-  } catch (e) {
-    data = await new Promise((resolve) => {
-      chrome.storage.local.get(keysToGet, resolve);
-    });
+    const configRes = await fetch(chrome.runtime.getURL("firebase-config.json"));
+    const firebaseConfig = await configRes.json();
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+  } catch (err) {
+    authStatusText.textContent = "Configuration Error";
+    authUserEmail.textContent = "Verify firebase-config.json";
+    authUserEmail.style.display = "block";
+    btnAuthAction.style.display = "none";
+    console.error("Firebase config load error:", err);
   }
 
-  let syncId = data[STORAGE_KEYS.SYNC_ID];
-  let syncPassword = data[STORAGE_KEYS.SYNC_PASSWORD];
+  // 2. Load custom profile config from storage
+  let data = await chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD]);
+  customSyncId = data[STORAGE_KEYS.SYNC_ID];
+  const storedPassword = data[STORAGE_KEYS.SYNC_PASSWORD];
 
-  // Populate Firebase overrides if they exist
-  fbApiKeyInput.value = data.firebase_apiKey || "";
-  fbAuthDomainInput.value = data.firebase_authDomain || "";
-  fbProjectIdInput.value = data.firebase_projectId || "";
-  fbStorageBucketInput.value = data.firebase_storageBucket || "";
-  fbMessagingSenderIdInput.value = data.firebase_messagingSenderId || "";
-  fbAppIdInput.value = data.firebase_appId || "";
-
-  // Auto-generate Sync ID on first launch
-  if (!syncId) {
-    syncId = generateSecureId(16);
-    await chrome.storage.local.set({ [STORAGE_KEYS.SYNC_ID]: syncId });
+  if (!customSyncId) {
+    customSyncId = generateSecureId(16);
+    await chrome.storage.local.set({ [STORAGE_KEYS.SYNC_ID]: customSyncId });
   }
 
-  syncIdInput.value = syncId;
-  if (syncPassword) {
-    syncPasswordInput.value = syncPassword;
+  syncIdInput.value = customSyncId;
+  if (storedPassword) {
+    syncPasswordInput.value = storedPassword;
     statusBadge.style.display = "flex";
   } else {
     statusBadge.style.display = "none";
   }
 
-  // Save Config
+  // 3. Monitor Auth State changes
+  if (auth) {
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUid = user.uid;
+        if (user.isAnonymous) {
+          authStatusText.textContent = "Authenticated (Anonymous)";
+          authUserEmail.style.display = "none";
+          syncIdInput.value = customSyncId;
+          btnRegen.disabled = false;
+        } else {
+          authStatusText.textContent = "Signed In";
+          authUserEmail.textContent = user.email || `UID: ${user.uid.substring(0, 10)}...`;
+          authUserEmail.style.display = "block";
+          
+          // Force Sync ID to use the user's Auth UID for seamless cross-device matching
+          syncIdInput.value = user.uid;
+          btnRegen.disabled = true;
+        }
+        btnAuthAction.textContent = "Sign Out";
+        btnAuthAction.className = "btn btn-secondary btn-full";
+      } else {
+        currentUid = null;
+        authStatusText.textContent = "Not Authenticated";
+        authUserEmail.style.display = "none";
+        syncIdInput.value = customSyncId;
+        btnRegen.disabled = false;
+        btnAuthAction.textContent = "Sign In to Sync";
+        btnAuthAction.className = "btn btn-full";
+      }
+    });
+  }
+
+  // Auth Button handler
+  btnAuthAction.addEventListener("click", async () => {
+    if (!auth) return;
+    if (auth.currentUser) {
+      // Sign Out
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error("Sign out failed:", err);
+      }
+    } else {
+      // Open auth.html in a new tab
+      chrome.tabs.create({ url: chrome.runtime.getURL("auth.html") });
+    }
+  });
+
+  // Save Sync Config
   btnSave.addEventListener("click", async () => {
     const enteredPassword = syncPasswordInput.value.trim();
     errorMsg.style.display = "none";
@@ -105,35 +127,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    if (syncIdInput.value.trim().length < 8) {
+    const targetSyncId = (auth && auth.currentUser && !auth.currentUser.isAnonymous) 
+      ? auth.currentUser.uid 
+      : syncIdInput.value.trim();
+
+    if (targetSyncId.length < 8) {
       errorMsg.textContent = "Error: Sync Profile ID must be at least 8 characters.";
       errorMsg.style.display = "block";
       return;
     }
 
-    const newSyncId = syncIdInput.value.trim();
-    const apiKey = fbApiKeyInput.value.trim();
-    const authDomain = fbAuthDomainInput.value.trim();
-    const projectId = fbProjectIdInput.value.trim();
-    const storageBucket = fbStorageBucketInput.value.trim();
-    const messagingSenderId = fbMessagingSenderIdInput.value.trim();
-    const appId = fbAppIdInput.value.trim();
+    if (!auth || !auth.currentUser) {
+      errorMsg.textContent = "Error: You must authenticate (anonymous or account sign-in) to sync.";
+      errorMsg.style.display = "block";
+      return;
+    }
 
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.SYNC_ID]: newSyncId,
-      [STORAGE_KEYS.SYNC_PASSWORD]: enteredPassword,
-      firebase_apiKey: apiKey,
-      firebase_authDomain: authDomain,
-      firebase_projectId: projectId,
-      firebase_storageBucket: storageBucket,
-      firebase_messagingSenderId: messagingSenderId,
-      firebase_appId: appId
-    });
+    // Update storage
+    const storageUpdate = {
+      [STORAGE_KEYS.SYNC_PASSWORD]: enteredPassword
+    };
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      customSyncId = targetSyncId;
+      storageUpdate[STORAGE_KEYS.SYNC_ID] = targetSyncId;
+    }
+    await chrome.storage.local.set(storageUpdate);
 
     // Notify service worker of key updates immediately
     chrome.runtime.sendMessage({
       type: "CONFIG_UPDATED",
-      syncId: newSyncId,
+      syncId: targetSyncId,
       syncPassword: enteredPassword
     }, () => {
       if (chrome.runtime.lastError) {
@@ -161,11 +184,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Regenerate Sync ID
-  btnRegen.addEventListener("click", () => {
+  btnRegen.addEventListener("click", async () => {
     if (confirm("Are you sure you want to regenerate your Sync ID? Devices using the old ID will lose synchronization.")) {
       const newId = generateSecureId(16);
+      customSyncId = newId;
       syncIdInput.value = newId;
-      statusBadge.style.display = "none"; // Hide active badge until saved
+      await chrome.storage.local.set({ [STORAGE_KEYS.SYNC_ID]: newId });
+      statusBadge.style.display = "none";
     }
   });
 });
