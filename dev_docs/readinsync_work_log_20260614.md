@@ -7,11 +7,14 @@
 - Integrated GitHub's `actions/upload-artifact@v4` action to upload the resulting `.zip` extension bundle to build artifacts.
 - Verified that the extension compiles successfully locally by running the build command in the `H:\ReaInSync` workspace.
 - Updated [readinsync_roadmap.md](file:///H:/ReaInSync/dev_docs/readinsync_roadmap.md) to document today's updates.
-- Strictly enforced a "no mocks, no fakes, and no default fallback placeholders" configuration:
-  - Added a build script [scripts/build-extension.js](file:///H:/ReaInSync/scripts/build-extension.js) that compiles the extension and replaces the background credentials with actual environment variables, failing the compilation loudly if they are not set.
-  - Configured [.github/workflows/ci.yml](file:///H:/ReaInSync/.github/workflows/ci.yml) to map required build environment variables directly to GitHub Actions Secrets.
-  - Refactored [src/App.tsx](file:///H:/ReaInSync/src/App.tsx) to fail-fast with a loud initialization error if required Firebase credentials are missing from the environment at runtime, completely removing hardcoded fallback configurations.
-  - Configured the extension [extension/background.js](file:///H:/ReaInSync/extension/background.js) to look for local storage overrides (`chrome.storage.local`) first when running on a local machine, failing loudly if no credentials are provided.
-  - Updated [extension/popup.html](file:///H:/ReaInSync/extension/popup.html) and [extension/popup.js](file:///H:/ReaInSync/extension/popup.js) with collapsible input fields allowing users to configure these override credentials locally.
-  - Updated [.env.example](file:///H:/ReaInSync/.env.example) and added `dist-extension/` build folder to [.gitignore](file:///H:/ReaInSync/.gitignore).
-  - Staged, committed, and pushed these strict security configuration updates directly to the remote repository.
+- Strictly enforced a "no mocks, no fakes, and no default fallback placeholders" configuration using official Firebase patterns:
+  - Discarded temporary build-time replacement environment variables in favor of a standard [firebase-config.json](file:///H:/ReaInSync/firebase-config.json) configuration file (added to [.gitignore](file:///H:/ReaInSync/.gitignore)).
+  - Created [firebase-config.example.json](file:///H:/ReaInSync/firebase-config.example.json) as a public configuration template.
+  - Setup a Vite configuration [vite-extension.config.ts](file:///H:/ReaInSync/vite-extension.config.ts) to compile the browser extension locally, resolving and bundling the official Firebase Auth and Firestore SDKs into self-contained files inside the packaged bundle.
+  - Updated [.github/workflows/ci.yml](file:///H:/ReaInSync/.github/workflows/ci.yml) to generate the `firebase-config.json` dynamically from GitHub Action Secrets (`FIREBASE_CONFIG_JSON`) at compile time.
+  - Refactored [src/App.tsx](file:///H:/ReaInSync/src/App.tsx) to import and validate the configuration directly, failing loudly if keys are missing or hold placeholders.
+  - Created [extension/auth.html](file:///H:/ReaInSync/extension/auth.html) and [extension/auth.js](file:///H:/ReaInSync/extension/auth.js) to support multi-provider authentication (Google Sign-In, GitHub, and Anonymous Sign-In) inside a secure extension-tab context.
+  - Updated [extension/popup.html](file:///H:/ReaInSync/extension/popup.html) and [extension/popup.js](file:///H:/ReaInSync/extension/popup.js) to monitor authentication state, automatically configure the Sync Profile ID from the authenticated user's `uid` on federated sign-in, and fall back to local storage profile configurations.
+  - Configured [extension/background.js](file:///H:/ReaInSync/extension/background.js) to asynchronously initialize Firebase Auth and Firestore, failing fast if the configuration is missing.
+  - Confirmed all TypeScript compile checks and Vite production builds pass successfully.
+  - Pushed all finalized code directly to the remote repository.
