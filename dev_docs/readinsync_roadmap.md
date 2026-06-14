@@ -55,4 +55,7 @@ Conducted a thorough engineering and security audit of the browser extension (`m
 ## Update: 2026-06-12
 Checked and resolved the GitHub security alert regarding hardcoded Google API credentials. Replaced hardcoded credentials in the extension background script (`extension/background.js`), the React companion simulator state (`src/App.tsx`), and the companion template definitions (`src/templates.ts`) with clear placeholder credentials to prevent leakage. Also resolved all 17 Dependabot security vulnerabilities by upgrading `web-ext` and locking transitive dependencies (`shell-quote`, `path-to-regexp`, `qs`) via package overrides, resulting in **0 vulnerabilities** reported.
 
+## Update: 2026-06-14
+Configured CI pipeline to compile the browser extension into a production-ready ZIP archive using `web-ext` build targeting the `extension/` directory, mimicking the deployment pattern found in `H:\tabtogether`. Verified the configuration by successfully compiling the extension locally.
+
 
