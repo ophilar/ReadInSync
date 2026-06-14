@@ -30,19 +30,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   const errorMsg = document.getElementById("errorMsg");
   const statusBadge = document.getElementById("statusBadge");
 
+  // Firebase elements
+  const toggleFirebase = document.getElementById("toggleFirebase");
+  const firebaseFields = document.getElementById("firebaseFields");
+  const toggleArrow = document.getElementById("toggleArrow");
+  const fbApiKeyInput = document.getElementById("fbApiKey");
+  const fbAuthDomainInput = document.getElementById("fbAuthDomain");
+  const fbProjectIdInput = document.getElementById("fbProjectId");
+  const fbStorageBucketInput = document.getElementById("fbStorageBucket");
+  const fbMessagingSenderIdInput = document.getElementById("fbMessagingSenderId");
+  const fbAppIdInput = document.getElementById("fbAppId");
+
+  // Collapsible toggle for Firebase credentials
+  toggleFirebase.addEventListener("click", () => {
+    const isHidden = firebaseFields.style.display === "none";
+    firebaseFields.style.display = isHidden ? "block" : "none";
+    toggleArrow.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+  });
+
   // Load from local storage
+  const keysToGet = [
+    STORAGE_KEYS.SYNC_ID,
+    STORAGE_KEYS.SYNC_PASSWORD,
+    "firebase_apiKey",
+    "firebase_authDomain",
+    "firebase_projectId",
+    "firebase_storageBucket",
+    "firebase_messagingSenderId",
+    "firebase_appId"
+  ];
+
   let data;
   try {
-    data = await chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD]);
+    data = await chrome.storage.local.get(keysToGet);
   } catch (e) {
-    // browser namespace fallback for pure Firefox compatibility
     data = await new Promise((resolve) => {
-      chrome.storage.local.get([STORAGE_KEYS.SYNC_ID, STORAGE_KEYS.SYNC_PASSWORD], resolve);
+      chrome.storage.local.get(keysToGet, resolve);
     });
   }
 
   let syncId = data[STORAGE_KEYS.SYNC_ID];
   let syncPassword = data[STORAGE_KEYS.SYNC_PASSWORD];
+
+  // Populate Firebase overrides if they exist
+  fbApiKeyInput.value = data.firebase_apiKey || "";
+  fbAuthDomainInput.value = data.firebase_authDomain || "";
+  fbProjectIdInput.value = data.firebase_projectId || "";
+  fbStorageBucketInput.value = data.firebase_storageBucket || "";
+  fbMessagingSenderIdInput.value = data.firebase_messagingSenderId || "";
+  fbAppIdInput.value = data.firebase_appId || "";
 
   // Auto-generate Sync ID on first launch
   if (!syncId) {
@@ -76,10 +112,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const newSyncId = syncIdInput.value.trim();
+    const apiKey = fbApiKeyInput.value.trim();
+    const authDomain = fbAuthDomainInput.value.trim();
+    const projectId = fbProjectIdInput.value.trim();
+    const storageBucket = fbStorageBucketInput.value.trim();
+    const messagingSenderId = fbMessagingSenderIdInput.value.trim();
+    const appId = fbAppIdInput.value.trim();
 
     await chrome.storage.local.set({
       [STORAGE_KEYS.SYNC_ID]: newSyncId,
-      [STORAGE_KEYS.SYNC_PASSWORD]: enteredPassword
+      [STORAGE_KEYS.SYNC_PASSWORD]: enteredPassword,
+      firebase_apiKey: apiKey,
+      firebase_authDomain: authDomain,
+      firebase_projectId: projectId,
+      firebase_storageBucket: storageBucket,
+      firebase_messagingSenderId: messagingSenderId,
+      firebase_appId: appId
     });
 
     // Notify service worker of key updates immediately

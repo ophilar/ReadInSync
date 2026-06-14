@@ -54,12 +54,28 @@ export default function App() {
   const [customTitle, setCustomTitle] = useState<string>("");
   const [customPercent, setCustomPercent] = useState<number>(0.5);
 
-  // Firestore placeholder configs (can be updated locally or overridden via env variables)
+  // Verify all required environment variables are defined; fail-fast if any are missing
+  const REQUIRED_VITE_VARS = [
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_STORAGE_BUCKET"
+  ];
+  const missingViteVars = REQUIRED_VITE_VARS.filter(v => !import.meta.env[v]);
+  if (missingViteVars.length > 0) {
+    throw new Error(
+      `❌ [ReadInSync] LOUD FAILURE: Missing required Firebase environment variables in React app:\n` +
+      missingViteVars.map(v => ` - ${v}`).join("\n") +
+      `\nPlease define these in a '.env.local' file in the root of the project.`
+    );
+  }
+
+  // Firestore configs loaded directly from env variables (no fallback defaults)
   const [firebaseConfig, setFirebaseConfig] = useState({
-    apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || "YOUR_FIREBASE_API_KEY",
-    projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || "YOUR_PROJECT_ID",
-    authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || "YOUR_PROJECT_ID.firebaseapp.com",
-    storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || "YOUR_PROJECT_ID.firebasestorage.app"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string
   });
 
   const activeSession = syncSessions.find(s => s.id === selectedSessionId) || syncSessions[0];

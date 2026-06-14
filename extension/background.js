@@ -24,9 +24,47 @@ const firebaseConfig = {
   appId: "YOUR_FIREBASE_APP_ID"
 };
 
-// Initialize Firebase App and Firestore Database references
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+let app = null;
+let db = null;
+
+async function getFirebaseDb() {
+  if (db) return db;
+
+  // Retrieve custom Firebase config from local storage first (for local machine / user overrides)
+  const storageData = await chrome.storage.local.get([
+    "firebase_apiKey",
+    "firebase_authDomain",
+    "firebase_projectId",
+    "firebase_storageBucket",
+    "firebase_messagingSenderId",
+    "firebase_appId"
+  ]);
+
+  const config = {
+    apiKey: storageData.firebase_apiKey || firebaseConfig.apiKey,
+    authDomain: storageData.firebase_authDomain || firebaseConfig.authDomain,
+    projectId: storageData.firebase_projectId || firebaseConfig.projectId,
+    storageBucket: storageData.firebase_storageBucket || firebaseConfig.storageBucket,
+    messagingSenderId: storageData.firebase_messagingSenderId || firebaseConfig.messagingSenderId,
+    appId: storageData.firebase_appId || firebaseConfig.appId
+  };
+
+  // Loud error if any required Firebase settings are missing or still placeholder values
+  const hasPlaceholders = Object.entries(config).some(([key, val]) => {
+    return !val || val.includes("YOUR_FIREBASE_") || val === "YOUR_PROJECT_ID.firebaseapp.com";
+  });
+
+  if (hasPlaceholders) {
+    throw new Error(
+      "❌ [ReadInSync] LOUD FAILURE: Firebase configuration is missing or holds placeholder values! " +
+      "Provide environment variables at build-time, or configure custom credentials under the extension's local storage options."
+    );
+  }
+
+  app = initializeApp(config);
+  db = getFirestore(app);
+  return db;
+}
 
 // In-memory caching of the active cryptographic key and Sync ID
 let derivedCryptoKey = null;
@@ -121,27 +159,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      const docId = getUrlHash(url);
-      const docPath = `users/${currentSyncId}/scroll_states/${docId}`;
-      const docRef = doc(db, docPath);
+      getFirebaseDb()
+        .then((database) => {
+          const docId = getUrlHash(url);
+          const docPath = `users/${currentSyncId}/scroll_states/${docId}`;
+          const docRef = doc(database, docPath);
 
-      // Formulate structured state and encrypt everything into a single ciphertext string
-      const statePayload = { url, title, percent };
-      
-      encryptPayload(statePayload, derivedCryptoKey)
-        .then(({ iv, ciphertext }) => {
-          // Only write encrypted package and public sorting timestamp
-          return setDoc(docRef, {
-            ciphertext: ciphertext,
-            iv: iv,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
+          // Formulate structured state and encrypt everything into a single ciphertext string
+          const statePayload = { url, title, percent };
+          
+          return encryptPayload(statePayload, derivedCryptoKey)
+            .then(({ iv, ciphertext }) => {
+              // Only write encrypted package and public sorting timestamp
+              return setDoc(docRef, {
+                ciphertext: ciphertext,
+                iv: iv,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+            });
         })
         .then(() => {
           sendResponse({ success: true });
         })
         .catch((error) => {
-          console.error("[ReadInSync] Error during payload encryption or setDoc execution:", error);
+          console.error("[ReadInSync] Error during database operations, payload encryption, or setDoc execution:", error);
           sendResponse({ success: false, error: error.message });
         });
     });
@@ -163,9 +204,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     }
 
     try {
+      const database = await getFirebaseDb();
       const docId = getUrlHash(tab.url);
       const docPath = `users/${currentSyncId}/scroll_states/${docId}`;
-      const docRef = doc(db, docPath);
+      const docRef = doc(database, docPath);
 
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
