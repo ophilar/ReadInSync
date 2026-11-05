@@ -18,7 +18,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "firebase": "^12.14.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -44,6 +44,7 @@
   "overrides": {
     "shell-quote": "^1.8.4",
     "path-to-regexp": "^0.1.13",
-    "qs": "^6.15.2"
+    "qs": "^6.15.2",
+    "@grpc/grpc-js": "^1.14.7"
   }
 }
